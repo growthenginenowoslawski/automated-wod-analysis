@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.automated-wod-analysis.inbox</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__WOD</string>
+    <string>watch</string>
+    <string>--once</string>
+    <string>--inbox</string>
+    <string>__INBOX__</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WOD_HOME</key><string>__WOD_HOME__</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>WatchPaths</key><array><string>__INBOX__</string></array>
+  <key>StandardOutPath</key><string>__WOD_HOME__/watcher.log</string>
+  <key>StandardErrorPath</key><string>__WOD_HOME__/watcher.log</string>
+</dict>
+</plist>
