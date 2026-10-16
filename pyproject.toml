@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "automated-wod-analysis"
-version = "0.4.0"
+version = "0.5.0"
 description = "Film a CrossFit workout, get reps, splits, transitions and fresh-speed benchmarks in a local database. Works with Claude and ChatGPT."
 readme = "README.md"
 license = {text = "MIT"}
@@ -15,6 +15,7 @@ dependencies = [
   "numpy>=1.24",
   "scipy>=1.10",
   "pandas>=2.0",
+  "imageio-ffmpeg>=0.4.9",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +26,9 @@ wod = "wod.cli:main"
 
 [tool.setuptools]
 packages = ["wod"]
+
+[tool.setuptools.package-data]
+wod = ["agent_guide.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

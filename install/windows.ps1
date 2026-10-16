@@ -1,51 +1,22 @@
-# Automated WOD Analysis: one-time setup on Windows 10/11.
-# Run in PowerShell from the repo folder:
-#   powershell -ExecutionPolicy Bypass -File install\windows.ps1
+# Automated WOD Analysis: setup for Windows 10/11. No admin rights needed.
+#   powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/growthenginenowoslawski/automated-wod-analysis/main/install/windows.ps1 | iex"
 $ErrorActionPreference = "Stop"
-$Here = Split-Path -Parent $PSScriptRoot
-$WodHome = if ($env:WOD_HOME) { $env:WOD_HOME } else { Join-Path $HOME "WODs" }
-$Inbox = if ($env:WOD_INBOX) { $env:WOD_INBOX } else { Join-Path $WodHome "inbox" }
-$Venv = Join-Path $HOME ".wod-venv"
-function Say($m) { Write-Host "`n$m" -ForegroundColor Cyan }
+$Src = if ($env:WOD_SOURCE) { $env:WOD_SOURCE } else { "https://github.com/growthenginenowoslawski/automated-wod-analysis/archive/refs/heads/main.zip" }
+$Uv = Join-Path $HOME ".local\bin\uv.exe"
 
-Say "1/4 Tools (ffmpeg, Python 3.12)"
-if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-  winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements
-  $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+Write-Host "1/3 Installing uv (a small tool that brings its own Python)..."
+if (-not (Get-Command uv -ErrorAction SilentlyContinue) -and -not (Test-Path $Uv)) {
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 }
-$Py = $null
-foreach ($v in "3.12", "3.11", "3.10") {
-  try { & py "-$v" --version *> $null; if ($LASTEXITCODE -eq 0) { $Py = @("py", "-$v"); break } } catch {}
-}
-if (-not $Py) {
-  winget install --id Python.Python.3.12 -e --accept-source-agreements --accept-package-agreements
-  $Py = @("py", "-3.12")
-}
+if (Get-Command uv -ErrorAction SilentlyContinue) { $Uv = (Get-Command uv).Source }
 
-Say "2/4 Installing the analyzer into $Venv"
-& $Py[0] $Py[1] -m venv $Venv
-& "$Venv\Scripts\python.exe" -m pip install -q --upgrade pip
-& "$Venv\Scripts\python.exe" -m pip install -q -e $Here
-$Bin = Join-Path $HOME ".local\bin"
-New-Item -ItemType Directory -Force -Path $Bin | Out-Null
-Set-Content -Path (Join-Path $Bin "wod.cmd") -Value "@echo off`r`nset WOD_HOME=$WodHome`r`n`"$Venv\Scripts\wod.exe`" %*"
-$UserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
-if ($UserPath -notlike "*$Bin*") { [System.Environment]::SetEnvironmentVariable("Path", "$UserPath;$Bin", "User") }
-$env:Path += ";$Bin"
+Write-Host "2/3 Installing Automated WOD Analysis..."
+& $Uv tool install --force --python 3.12 "automated-wod-analysis @ $Src"
 
-Say "3/4 Body-tracking model and data folder ($WodHome)"
-$env:WOD_HOME = $WodHome
-& "$Venv\Scripts\wod.exe" doctor --download
+& $Uv tool update-shell *> $null   # so new PowerShell windows find `wod`
 
-Say "4/4 Inbox watcher (starts when you log in; drop a video + its workout into $Inbox)"
-New-Item -ItemType Directory -Force -Path $Inbox | Out-Null
-$Action = New-ScheduledTaskAction -Execute "$Venv\Scripts\wod.exe" -Argument "watch --inbox `"$Inbox`""
-$Trigger = New-ScheduledTaskTrigger -AtLogOn
-$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0
-Register-ScheduledTask -TaskName "AutomatedWODAnalysis" -Action $Action -Trigger $Trigger -Settings $Settings -Force | Out-Null
-Start-ScheduledTask -TaskName "AutomatedWODAnalysis"
+Write-Host "3/3 Setting up (model, folders, assistant instructions, inbox watcher)..."
+& (Join-Path $HOME ".local\bin\wod.exe") setup
 
-Say "Done. Open a new PowerShell window, then:"
-Write-Host "  wod analyze $HOME\Downloads\IMG_1234.MOV --workout examples\amrap.txt"
-Write-Host "  wod stats   ·   wod dashboard   ·   wod summary"
-Write-Host "  Using Claude Code: copy skills\automated-wod-analysis to $HOME\.claude\skills\"
+Write-Host ""
+Write-Host "Done. Open a new PowerShell window and type: wod doctor"

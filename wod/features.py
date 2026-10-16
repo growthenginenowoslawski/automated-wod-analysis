@@ -67,13 +67,15 @@ class Signals:
         return (self.t >= a) & (self.t <= b)
 
     def peaks(self, x, a=None, b=None, height=None, prominence=None, min_gap=0.5, mask=None):
+        """Peak times of signal x between a and b. Frames outside `mask` are pushed to the floor rather than
+        cut out, so the dip between two reps survives even when the frames in the dip are unreliable."""
         a = self.t[0] if a is None else a
         b = self.t[-1] if b is None else b
         m = self.idx(a, b)
-        if mask is not None:
-            m &= mask
         tt = self.t[m]
         xx = np.nan_to_num(x[m], nan=-99)
+        if mask is not None:
+            xx = np.where(mask[m], xx, -99)
         p, _ = sg.find_peaks(xx, height=height, prominence=prominence, distance=max(1, int(min_gap * self.fps)))
         return tt[p]
 

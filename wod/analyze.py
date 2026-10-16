@@ -75,6 +75,10 @@ def analyze(sig, spec, audio=None):
 
     # drop tiny stray blocks (e.g. a single overhead stretch) when they don't fit the plan
     blocks = [b for b in blocks if b["reps"] >= 2 or b["end"] - b["start"] > 4]
+    # setting up the camera / warming up: partial blocks at the very start, well before the real work begins
+    exp = {m["key"]: (m.get("reps") or 0) for m in known}
+    while len(blocks) > 1 and blocks[0]["reps"] < 0.5 * exp.get(blocks[0]["key"], 0) and blocks[1]["start"] - blocks[0]["end"] > 20:
+        blocks.pop(0)
 
     # 5) rounds: a new round starts when a movement repeats
     rounds, cur = [], []

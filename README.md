@@ -1,14 +1,34 @@
 # Automated WOD Analysis
 
-Film your CrossFit workout, and get back:
+**Film your CrossFit workout. Get back exactly where your time went.**
 
-- the **movements**, **reps per set** (12 + 8), and **time for every movement, every round**
-- **transitions and rest**: where the clock actually went
+- every movement, **reps per set** (12 + 8) and **time per movement, per round**
+- **transitions and rest**: the seconds you lose between movements
 - **round times, your score**, and how your pace changed from the first round to the last
-- **fresh speed**: how long 10 reps of each movement take in round 1, before fatigue, tracked over time
-- a **local database** of every workout, round, set and rep, so you can ask "how has my snatch pace changed?" without reprocessing anything
+- **fresh speed**: how fast you do 10 reps in round 1, before fatigue, tracked over time
+- a private **workout history** on your own computer you can ask questions about ("how has my bike pace changed?")
 
-It runs **on your own computer** (Mac or Windows). The video never leaves it. Use it with **Claude** or **ChatGPT**: your assistant reads the results and answers questions, inside your normal plan limits. No API keys, no extra accounts.
+Works on **Mac and Windows**, with **Claude** or **ChatGPT**. Your video never leaves your computer, and it runs inside your normal Claude/ChatGPT plan: no API keys, no extra accounts.
+
+---
+
+## Get started: paste one message
+
+Open **Claude Code** (in the Claude desktop app) or **Codex** (ChatGPT's agent app). Choose a folder if it asks, any folder is fine. Then paste this:
+
+> Set up Automated WOD Analysis for me by following the instructions at https://raw.githubusercontent.com/growthenginenowoslawski/automated-wod-analysis/main/AGENTS.md. Do every step yourself. I'm not technical, so only ask me when you need me to do something. Then analyze my workout video.
+
+Your assistant installs everything, which takes a few minutes and needs no password. Then it asks you for:
+1. **the video**, e.g. "it's the newest video in my Downloads"
+2. **the workout**: paste the whiteboard text or attach a screenshot
+
+That's it. Next time just say *"Analyze my workout video"*. It remembers how.
+
+> **Tip:** start a new chat for each workout. It keeps your usage low.
+
+---
+
+## What you get
 
 ```
 | Step              | Round 1                     | Round 2                     | Round 3                      |
@@ -17,93 +37,77 @@ It runs **on your own computer** (Mac or Windows). The video never leaves it. Us
 | 18 cal C2 Bike    | 56s · 19 cal/min · then 35s | 79s · 14 cal/min · then 7s  | 104s · 10 cal/min · then 11s |
 | 24 cal C2 Bike    | 87s · 17 cal/min · then 16s | 131s · 11 cal/min · then 6s | 127s · 11 cal/min            |
 ```
+Plus your longest transitions, fresh-speed baselines, anything worth a second look, and a dashboard with charts across all your workouts.
 
-## Install (once)
+## How to film
 
-You need about 1 GB of free space. The installer sets up ffmpeg, Python 3.12 if missing, the analyzer, a 9 MB body-tracking model and an inbox folder.
+1. **Prop your phone up** and don't touch it until you're done.
+2. **Fit everything in the shot**: your whole body, the barbell, the rig, the rope area and the machines.
+3. **Film from the side or at an angle**, so the rig doesn't block you on the bar or rings.
+4. **Keep training partners out of the shot.** It follows one person.
+5. **Hit record before "3-2-1-go".**
 
-**Mac.** Open Terminal:
-```bash
-git clone https://github.com/growthenginenowoslawski/automated-wod-analysis.git
-cd automated-wod-analysis
-bash install/mac.sh
-```
+## No AI needed for the analysis itself
 
-**Windows 10/11.** Open PowerShell:
-```powershell
-git clone https://github.com/growthenginenowoslawski/automated-wod-analysis.git
-cd automated-wod-analysis
-powershell -ExecutionPolicy Bypass -File install\windows.ps1
-```
-No git? Download the ZIP from the green **Code** button, unzip it and run the same install line inside the folder.
-
-Check it any time with `wod doctor`.
-
-## Use it
-
-**With Claude** (Claude Code or the Claude desktop app). Add the skill (see [integrations/claude.md](integrations/claude.md)), then say *"Analyze ~/Downloads/IMG_1234.MOV"* and attach a screenshot of the workout.
-
-**With ChatGPT** (Codex, or plain ChatGPT chat). See [integrations/chatgpt.md](integrations/chatgpt.md). Codex reads this repo's `AGENTS.md` automatically. In regular ChatGPT, paste the output of `wod summary` or upload `~/WODs/wod.db`.
-
-**On its own.**
-```bash
-wod analyze ~/Downloads/IMG_1234.MOV --workout "AMRAP 8:00\n36 Double Unders\n6 Toes to Bar\n6 Power Snatch 95/65lbs"
-```
-or drop the video and a `.txt` with the workout (same name) into `~/WODs/inbox`. With Claude Code or Codex installed, a screenshot works instead of the `.txt`.
-
-## Ask your data
-
-```bash
-wod stats                       # every movement: fresh-10 time, average pace, biggest unbroken set, slowest transitions
-wod movement "toes to bar"      # one movement's history, round by round
-wod workout latest              # a report again, instantly
-wod summary                     # compact text for any chatbot
-wod dashboard                   # charts in your browser (offline)
-wod sql "SELECT * FROM v_weekly_volume"
-```
-
-Everything lives in `~/WODs/`: `wod.db` (SQLite), `archive/` (the raw tracking data for every workout, about 5-10 MB each), `dashboard.html`. The same video is recognized and never processed twice. When the counting rules improve, `wod reanalyze --all` updates every past workout in seconds, without the videos. Wrong count? `wod correct latest --round 2 --movement "double unders" --reps 36`. Your fix sticks and becomes a test case. See [docs/database.md](docs/database.md).
+After setup, drop a video and a `.txt` with the workout (same file name) into the **WODs → inbox** folder in your home folder. It's analyzed automatically and you get a notification. Then ask your assistant questions whenever you like.
 
 ## What it can track
 
-| Movement | How | Confidence |
-|---|---|---|
-| Double-unders, singles | hip-bounce rhythm, cross-checked with the rope's clicks in the audio | time: high · count: ±10% |
-| Toes-to-bar, knees-to-elbows | hanging, feet rising | high |
-| Power snatch, clean & jerk, thrusters, push press/jerk, shoulder-to-overhead | bar overhead (lockouts) | high |
-| Bike, row, ski erg | staying in place with legs cycling | time: high (calories come from the workout) |
-| Sandbag/farmer/front-rack carries | travel with the load in front | time: medium (distance comes from the workout) |
-| Muscle-ups | hanging and getting above the rings/bar | time: medium · count only when clearly visible |
-| Pull-ups, chest-to-bar, power cleans | hanging + pull · bar to shoulders | medium (less tested) |
+| Movement | Confidence |
+|---|---|
+| Double-unders, single-unders | time: high · count: ±10% |
+| Toes-to-bar, knees-to-elbows | high |
+| Snatches, clean & jerks, thrusters, push press/jerk, shoulder-to-overhead | high |
+| Bike, row, ski erg | time: high (calories come from the workout) |
+| Sandbag / farmer / front-rack carries | time: medium (distance comes from the workout) |
+| Muscle-ups | time: medium · count only when clearly visible |
+| Pull-ups, chest-to-bar, power cleans | medium |
 
-Anything else in a workout is listed as "not in the movement library yet" and skipped. Adding one is a small change in `wod/movements.py`. Pull requests are welcome, especially with a labeled video.
+Anything else in a workout is skipped, and the report tells you which. Adding a movement is a small change. Contributions are welcome.
 
-## Film it so it can be read
+---
 
-1. **Prop the phone up** and don't touch it until you're done. Landscape is best.
-2. **Get everything in frame**: your whole body, the bar, rope area, rig and machines.
-3. **Make sure the rig doesn't block you.** Film from the side so you're visible above the rings or bar.
-4. **Keep training partners out of the shot.** The tracker follows one person.
-5. **Start recording before "3-2-1-go"**, with the timer beep audible.
+## For the technically curious
 
-More in [docs/filming.md](docs/filming.md).
+<details>
+<summary>Manual install, commands, how it works</summary>
 
-## How it works
-
-1. `ffmpeg` straightens sideways phone video and shrinks it.
-2. Google's MediaPipe pose model finds 33 body points in every frame. This uses all your CPU cores, about 1-3 minutes per 10 minutes of video.
-3. Body signals (wrist height, hip bounce, feet off the floor, hips staying put…) and audio clicks become events. The workout text says which movements, in what order and how many, so the analyzer only has to find and count known things.
-4. Workouts with repeated steps, machines, carries or prescribed rest use **sequence mode**. It anchors on the most reliable movement (e.g. the bike) and fills the steps between.
-5. Results are checked against the workout. Rounds that don't add up are flagged with 4 saved frames, so your assistant looks at a few pictures instead of the whole video. This is what keeps it cheap enough to run inside a normal Claude or ChatGPT plan.
-
-## Development
-
+**Install without an assistant.** Mac/Linux terminal:
 ```bash
-pip install -e ".[dev]"
-pytest                          # parser + database tests (no video needed)
-python -m tests.check_accuracy  # re-counts your labeled workouts + every correction you've saved
+curl -LsSf https://raw.githubusercontent.com/growthenginenowoslawski/automated-wod-analysis/main/install/mac.sh | bash
+```
+Windows PowerShell:
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/growthenginenowoslawski/automated-wod-analysis/main/install/windows.ps1 | iex"
+```
+Both use [uv](https://docs.astral.sh/uv/), which brings its own Python. ffmpeg comes bundled. Nothing needs admin rights.
+
+**Commands.**
+```
+wod analyze VIDEO --workout "AMRAP 8:00\n36 Double Unders\n6 Toes to Bar"   # --fast, --quiet, --notes, --date
+wod stats | wod movement "toes to bar" | wod list | wod workout latest | wod summary
+wod dashboard                   # charts in your browser, offline
+wod sql "SELECT * FROM v_weekly_volume"     # read-only SQL; `wod schema` lists tables
+wod correct latest --round 2 --movement "double unders" --reps 36
+wod reanalyze --all             # re-count every past workout from saved data (no videos needed)
+wod guide                       # the instructions AI assistants follow
+wod doctor | wod setup | wod watch
 ```
 
-## License
+**Plain chat (no agent).** Run `wod summary` and paste the output into Claude or ChatGPT, or upload `~/WODs/wod.db`; both can read SQLite files.
 
-MIT. Not affiliated with CrossFit, LLC.
+**Where your data lives.** `~/WODs/wod.db` (SQLite), `~/WODs/archive/` (tracking data per workout, about 5-10 MB each), `~/WODs/dashboard.html`. See [docs/database.md](docs/database.md).
+
+**How it works.**
+1. The video is straightened and shrunk.
+2. Google's MediaPipe pose model finds 33 body points per frame, using all CPU cores. That's about 5 minutes for a 24-minute video on a 2-core machine, and faster on a modern laptop.
+3. Body signals and the rope's clicks in the audio become events.
+4. The workout text tells it what to look for, in what order.
+5. Counts are checked against the workout, and anything that doesn't add up is flagged with 4 saved frames for the assistant to check.
+
+The assistant reads text, never the video.
+
+**Develop.** `pip install -e ".[dev]"`, `pytest`, `python -m tests.check_accuracy`. Assistant instructions live in `wod/agent_guide.md`; run `python tools/sync_docs.py` after editing.
+</details>
+
+MIT license. Not affiliated with CrossFit, LLC.

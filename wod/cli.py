@@ -1,5 +1,8 @@
 """wod — analyze CrossFit workout videos and keep every number in a local database.
 
+  wod setup                      one-time setup (model, folders, AI assistant instructions, inbox watcher)
+  wod guide                      step-by-step instructions for AI assistants (Claude, Codex/ChatGPT…)
+
   wod analyze VIDEO --workout "AMRAP 8:00\\n36 Double Unders\\n6 Toes to Bar\\n6 Power Snatch"
         [--date 2026-10-15] [--hr heart.csv] [--notes "felt heavy"] [--force]
         A video that was already analyzed is recognized and NOT processed again (use --force to redo it).
@@ -37,20 +40,25 @@ from . import db as DB
 HERE = Path(__file__).resolve().parent.parent
 
 
-MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/"
-             "float16/latest/pose_landmarker_full.task")
+MODEL_URLS = {
+    "full": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task",
+    "lite": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
+}
+MODEL_URL = MODEL_URLS["full"]
 
 
-def find_model(download=True):
-    for p in [os.environ.get("WOD_POSE_MODEL"), DB.WOD_HOME / "models" / "pose_landmarker_full.task",
-              HERE / "models" / "pose_landmarker_full.task", Path.home() / "Downloads" / "pose_landmarker_full.task"]:
+def find_model(download=True, kind="full"):
+    name = f"pose_landmarker_{kind}.task"
+    env = os.environ.get("WOD_POSE_MODEL") if kind == "full" else None
+    for p in [env, DB.WOD_HOME / "models" / name, HERE / "models" / name, Path.home() / "Downloads" / name]:
         if p and Path(p).exists():
             return Path(p)
     if not download:
         return None
-    dst = DB.WOD_HOME / "models" / "pose_landmarker_full.task"
+    dst = DB.WOD_HOME / "models" / name
     dst.parent.mkdir(parents=True, exist_ok=True)
-    print("Downloading the body-tracking model (9 MB, once)…", flush=True)
+    MODEL_URL = MODEL_URLS[kind]
+    print(f"Downloading the body-tracking model ({kind}, about {9 if kind == 'full' else 6} MB, once)…", flush=True)
     import urllib.request
     try:
         urllib.request.urlretrieve(MODEL_URL, dst)
@@ -61,15 +69,22 @@ def find_model(download=True):
 
 def creation_time(video):
     try:
-        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format_tags=creation_time",
-                              "-of", "default=nw=1:nk=1", str(video)], capture_output=True, text=True).stdout.strip()
-        return datetime.fromisoformat(out.replace("Z", "+00:00")) if out else None
+        from . import ff
+        return ff.probe(video)["creation_time"]
     except Exception:
         return None
 
 
-def _log(t0):
+def _log(t0, quiet=False):
+    if quiet:
+        return lambda m: None
     return lambda m: print(f"[{time.time() - t0:5.0f}s] {m}", flush=True)
+
+
+def tracking_fps(spec, fast=False):
+    """15 frames/sec for everything. Tested: 10 frames/sec looked fine in simulation but made the real tracker
+    lose the athlete more often, which broke machine detection on a 24-minute interval workout."""
+    return 15
 
 
 def _spec_from(a, video=None):
@@ -145,7 +160,7 @@ def cmd_analyze(a):
     video = Path(a.video).expanduser().resolve()
     con = DB.connect()
     t0 = time.time()
-    log = _log(t0)
+    log = _log(t0, a.quiet)
     log("fingerprinting video")
     fp = a.fingerprint or DB.fingerprint(video)
     hit = DB.find_by_fp(con, fp)
@@ -162,14 +177,15 @@ def cmd_analyze(a):
     work = DB.WOD_HOME / ".work" / fp
     work.mkdir(parents=True, exist_ok=True)
     json.dump(spec, open(work / "workout.json", "w"), indent=1)
-    model = find_model()
+    model = find_model(kind="lite" if a.fast else "full")
     factory = make_factory(model)
     small, pose_json = work / "small.mp4", work / "pose.json"
     if not pose_json.exists():
         rot, scores = prep.detect_rotation(video, factory)
         log(f"orientation: {rot}")
-        prep.transcode(video, small, rotation=rot)
-        log("video prepared")
+        fps = tracking_fps(spec, a.fast)
+        prep.transcode(video, small, rotation=rot, fps=fps)
+        log(f"video prepared ({fps} frames/sec)")
         from .pose import extract_parallel
         extract_parallel(small, model, pose_json, workers=a.workers, progress=lambda p: log(f"tracking body… {p:.0%}"))
         log("body tracking done")
@@ -179,8 +195,10 @@ def cmd_analyze(a):
         if not wav.exists():
             prep.extract_audio(video, wav)
     res = _run_analysis(json.load(open(pose_json)), spec, str(wav) if wav else None)
-    for f in res["flags"]:
-        if "movement" in f and small.exists():
+    # frames for the assistant to check: at most 3 flagged steps, and only ones that were visible
+    # (a step hidden behind the rig won't get clearer by looking at it)
+    for f in [f for f in res["flags"] if "movement" in f and f.get("start") is not None][:3]:
+        if small.exists():
             review_frames(small, f, work / "review")
     hr = None
     if a.hr:
@@ -393,7 +411,11 @@ def cmd_doctor(a):
         ok &= bool(good)
         print(f"{'OK ' if good else 'MISSING'} {name}{'' if good else '  → ' + fix}")
     chk("Python " + sys.version.split()[0], sys.version_info >= (3, 9), "install Python 3.10-3.12")
-    chk("ffmpeg", shutil.which("ffmpeg") and shutil.which("ffprobe"), "Mac: brew install ffmpeg · Windows: winget install Gyan.FFmpeg")
+    try:
+        from . import ff
+        chk("ffmpeg (" + ("system" if shutil.which("ffmpeg") else "bundled") + ")", ff.exe())
+    except SystemExit:
+        chk("ffmpeg", False, "run `wod setup`")
     for mod in ("mediapipe", "cv2", "numpy", "scipy", "pandas"):
         try:
             __import__(mod)
@@ -405,12 +427,28 @@ def cmd_doctor(a):
     print("\nReady." if ok else "\nFix the items above, then run `wod doctor` again.")
 
 
+def cmd_setup(a):
+    from .setup_cmd import setup
+    setup(no_watcher=a.no_watcher)
+
+
+def cmd_guide(a):
+    from .setup_cmd import guide_text
+    print(guide_text())
+
+
 def cmd_watch(a):
     from .watch import watch
     watch(Path(a.inbox).expanduser() if a.inbox else DB.WOD_HOME / "inbox", once=a.once)
 
 
 def main():
+    # Windows terminals default to a legacy code page; reports use a few non-ASCII symbols
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser(prog="wod", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("analyze")
@@ -422,6 +460,8 @@ def main():
     s.add_argument("--notes")
     s.add_argument("--force", action="store_true")
     s.add_argument("--workers", type=int, help="CPU cores for body tracking (default: all, up to 8)")
+    s.add_argument("--fast", action="store_true", help="experimental: smaller body-tracking model, faster but less accurate")
+    s.add_argument("--quiet", action="store_true", help="print only the final report (best for AI assistants)")
     s.add_argument("--fingerprint", help=argparse.SUPPRESS)   # when the video was pre-compressed elsewhere
     s = sub.add_parser("reanalyze")
     s.add_argument("id", nargs="?")
@@ -456,6 +496,9 @@ def main():
     s.add_argument("id", nargs="?", default="latest")
     s = sub.add_parser("doctor")
     s.add_argument("--download", action="store_true")
+    s = sub.add_parser("setup")
+    s.add_argument("--no-watcher", action="store_true")
+    sub.add_parser("guide")
     s = sub.add_parser("watch")
     s.add_argument("--inbox")
     s.add_argument("--once", action="store_true")
@@ -467,7 +510,7 @@ def main():
     {"analyze": cmd_analyze, "reanalyze": cmd_reanalyze, "rebuild": cmd_rebuild, "correct": cmd_correct, "note": cmd_note,
      "workout": cmd_workout, "list": cmd_list, "stats": cmd_stats, "movement": cmd_movement, "sql": cmd_sql,
      "schema": cmd_schema, "export": cmd_export, "dashboard": cmd_dashboard, "summary": cmd_summary,
-     "doctor": cmd_doctor, "watch": cmd_watch}[a.cmd](a)
+     "doctor": cmd_doctor, "watch": cmd_watch, "setup": cmd_setup, "guide": cmd_guide}[a.cmd](a)
 
 
 if __name__ == "__main__":

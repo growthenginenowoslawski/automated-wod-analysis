@@ -4,6 +4,7 @@ import json
 import subprocess
 from datetime import date
 from pathlib import Path
+from . import ff as _ff
 
 
 def mmss(s):
@@ -167,7 +168,7 @@ def review_frames(video, flag, out_dir, n=4):
     a, b = flag["start"], flag["end"]
     for i in range(n):
         t = a + (b - a) * (i + 0.5) / n
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(video), "-vf", "scale=-2:360",
+        subprocess.run([_ff.exe(), "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(video), "-vf", "scale=-2:360",
                         "-frames:v", "1", str(out / f"{i}_{t:.1f}s.jpg")], check=False)
     flag["frames_dir"] = str(out)
 

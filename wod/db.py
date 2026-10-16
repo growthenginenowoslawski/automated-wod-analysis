@@ -23,6 +23,7 @@ import sqlite3
 import statistics
 from datetime import datetime
 from pathlib import Path
+from . import ff as _ff
 
 ANALYZER_VERSION = "0.4.0"
 WOD_HOME = Path(os.environ.get("WOD_HOME", Path.home() / "WODs"))
@@ -206,14 +207,14 @@ def save_archive(wid, work_dir, source, home=None):
             shutil.copyfileobj(f, g)
     wav = work_dir / "audio.wav"
     if wav.exists() and not (d / "audio.m4a").exists():
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(wav), "-c:a", "aac", "-b:a", "48k", str(d / "audio.m4a")], check=False)
+        subprocess.run([_ff.exe(), "-v", "error", "-y", "-i", str(wav), "-c:a", "aac", "-b:a", "48k", str(d / "audio.m4a")], check=False)
     for name in ("workout.json", "result.json", "report.md"):
         if (work_dir / name).exists():
             shutil.copy2(work_dir / name, d / name)
     small = work_dir / "small.mp4"
     if small.exists() and not (d / "thumb.jpg").exists():
         dur = source.get("video_duration_s") or 10
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{dur * 0.3:.1f}", "-i", str(small), "-vf", "scale=-2:360",
+        subprocess.run([_ff.exe(), "-v", "error", "-y", "-ss", f"{dur * 0.3:.1f}", "-i", str(small), "-vf", "scale=-2:360",
                         "-frames:v", "1", str(d / "thumb.jpg")], check=False)
     rv = work_dir / "review"
     if rv.exists():
@@ -239,7 +240,7 @@ def audio_wav(d, tmp_dir):
         return None
     out = Path(tmp_dir) / "audio.wav"
     if not out.exists():
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(d / "audio.m4a"), "-ac", "1", "-ar", "16000", str(out)], check=True)
+        subprocess.run([_ff.exe(), "-v", "error", "-y", "-i", str(d / "audio.m4a"), "-ac", "1", "-ar", "16000", str(out)], check=True)
     return str(out)
 
 

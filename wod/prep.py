@@ -6,6 +6,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from . import ff as _ff
 
 ROTATIONS = {  # name -> (ffmpeg filter, cv2 rotate code)
     "none": ("", None),
@@ -23,11 +24,8 @@ def run(cmd):
 
 
 def probe(path):
-    out = run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)])
-    info = json.loads(out)
-    dur = float(info["format"]["duration"])
-    has_audio = any(s.get("codec_type") == "audio" for s in info["streams"])
-    return {"duration": dur, "has_audio": has_audio}
+    from . import ff
+    return ff.probe(path)
 
 
 def sample_frames(path, n=8, height=480):
@@ -38,7 +36,7 @@ def sample_frames(path, n=8, height=480):
         for i in range(n):
             t = dur * (i + 1) / (n + 1)
             f = Path(td) / f"f{i}.jpg"
-            run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(path),
+            run([_ff.exe(), "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(path),
                  "-vf", f"scale=-2:{height}", "-frames:v", "1", str(f)])
             img = cv2.imread(str(f))
             if img is not None:
@@ -76,9 +74,9 @@ def transcode(src, dst, rotation="none", long_side=640, fps=15):
     # MediaPipe works at ~256px internally, so 640px on the long side loses nothing and is fast.
     scale = f"scale='if(gt(iw,ih),{long_side},-2)':'if(gt(iw,ih),-2,{long_side})'"
     vf = [f for f in [ROTATIONS[rotation][0], scale, f"fps={fps}"] if f]
-    run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-vf", ",".join(vf), "-an",
+    run([_ff.exe(), "-v", "error", "-y", "-i", str(src), "-vf", ",".join(vf), "-an",
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", str(dst)])
 
 
 def extract_audio(src, dst, sr=16000):
-    run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-ar", str(sr), str(dst)])
+    run([_ff.exe(), "-v", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-ar", str(sr), str(dst)])
