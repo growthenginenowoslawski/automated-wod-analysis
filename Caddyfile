@@ -1,0 +1,22 @@
+{
+	admin off
+}
+:{$PORT:8080} {
+	root * /srv
+	encode gzip
+	@hidden path /Caddyfile /Dockerfile /README.md /vercel.json
+	respond @hidden 404
+	header {
+		# wasm-unsafe-eval lets the body tracker (WebAssembly) start; nothing else is loosened.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' blob: data: https://*.supabase.co https://raw.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		Permissions-Policy "camera=(self), microphone=(self)"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Content-Type-Options "nosniff"
+	}
+	@static path /vendor/* /models/* /icons/*
+	header @static Cache-Control "public, max-age=31536000, immutable"
+	@code path / /index.html /app.js /config.js /style.css /manifest.webmanifest
+	header @code Cache-Control "no-cache"
+	header /manifest.webmanifest Content-Type "application/manifest+json"
+	file_server
+}
