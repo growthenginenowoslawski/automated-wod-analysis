@@ -4,7 +4,7 @@
 :{$PORT:8080} {
 	root * /srv
 	encode gzip
-	@hidden path /Caddyfile /Dockerfile /README.md /vercel.json
+	@hidden path /Caddyfile /Dockerfile /README.md /vercel.json /tools/* /supabase/*
 	respond @hidden 404
 	header {
 		# wasm-unsafe-eval lets the body tracker (WebAssembly) start; nothing else is loosened.
