@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WOD Tracker</title>
+<meta name="description" content="Film your workout and get every split. Tracking test, week 1.">
+<meta name="theme-color" content="#F4F5F1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="WOD Tracker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">WOD Tracker <span class="tag">tracking test</span></div>
+</header>
+
+<main>
+  <!-- Home -->
+  <section id="home" class="screen active">
+    <h1>Can your phone track a whole workout?</h1>
+    <p class="lead">This test checks one thing before we build the app: whether body tracking runs fast enough, for long enough, on your iPhone. Nothing is analyzed yet. You'll send the results to Claude at the end.</p>
+
+    <button class="card" id="go-live">
+      <span class="card-title">Live test</span>
+      <span class="card-body">Prop the phone up, film a real workout of 20&ndash;30 minutes, then hit Stop. Keep this app open the whole time.</span>
+    </button>
+
+    <button class="card" id="go-video">
+      <span class="card-title">Video test</span>
+      <span class="card-body">Pick a workout video you already filmed. Measures how long the phone takes to track it.</span>
+    </button>
+
+    <details class="tips">
+      <summary>Filming checklist</summary>
+      <ul>
+        <li>Phone propped up and still, sideways (landscape).</li>
+        <li>Your whole body, the bar, the rope area and any machine in frame.</li>
+        <li>Side-on or at 45&deg;, so the rig doesn't hide you.</li>
+        <li>Plug the phone in if you can. The screen stays on during the test.</li>
+        <li>Don't switch apps: tracking pauses while you're away.</li>
+      </ul>
+    </details>
+    <p class="fine" id="install-hint">Tip: tap Share, then <b>Add to Home Screen</b>, to open this like an app.</p>
+  </section>
+
+  <!-- Live -->
+  <section id="live" class="screen">
+    <div class="stage">
+      <video id="cam" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="stage-msg" id="live-msg">Starting camera&hellip;</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">Time</span><span class="v" id="s-time">0:00</span></div>
+      <div class="stat"><span class="k">Tracking</span><span class="v" id="s-fps">&ndash;</span><span class="u">frames/s</span></div>
+      <div class="stat"><span class="k">Body found</span><span class="v" id="s-body">&ndash;</span></div>
+      <div class="stat"><span class="k">Per frame</span><span class="v" id="s-ms">&ndash;</span><span class="u">ms</span></div>
+    </div>
+    <p class="fine" id="live-note">Target: 15 frames a second.</p>
+    <div class="actions">
+      <button class="btn primary" id="live-start" disabled>Start</button>
+      <button class="btn danger" id="live-stop" hidden>Stop</button>
+      <button class="btn" id="live-back">Back</button>
+    </div>
+  </section>
+
+  <!-- Video -->
+  <section id="video" class="screen">
+    <h2>Video test</h2>
+    <p class="lead">Pick a workout video. The phone tracks it frame by frame, 15 frames per second of video, just like the desktop tool.</p>
+    <label class="btn primary file">Choose a video<input type="file" id="file" accept="video/*"></label>
+    <div class="stage small" hidden id="vstage">
+      <video id="vid" playsinline muted preload="auto"></video>
+      <canvas id="voverlay"></canvas>
+    </div>
+    <div class="progress" hidden id="vprog"><div class="bar" id="vbar"></div></div>
+    <div class="stats" hidden id="vstats">
+      <div class="stat"><span class="k">Done</span><span class="v" id="v-done">0%</span></div>
+      <div class="stat"><span class="k">Speed</span><span class="v" id="v-speed">&ndash;</span><span class="u">&times; real time</span></div>
+      <div class="stat"><span class="k">Time left</span><span class="v" id="v-eta">&ndash;</span></div>
+      <div class="stat"><span class="k">Body found</span><span class="v" id="v-body">&ndash;</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn danger" id="v-stop" hidden>Stop</button>
+      <button class="btn" id="video-back">Back</button>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="results" class="screen">
+    <h2 id="r-title">Results</h2>
+    <p class="lead" id="r-verdict"></p>
+    <table class="rt"><tbody id="r-table"></tbody></table>
+    <h3>Frames per second, minute by minute</h3>
+    <canvas id="r-chart" height="140"></canvas>
+    <p class="fine">If the line sags in later minutes, the phone was slowing down to stay cool.</p>
+    <div class="actions">
+      <button class="btn primary" id="r-send">Send results to Claude</button>
+      <button class="btn" id="r-save">Save the file</button>
+      <button class="btn" id="r-home">Done</button>
+    </div>
+    <p class="fine" id="r-status"></p>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
