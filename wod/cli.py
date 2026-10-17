@@ -45,6 +45,7 @@ MODEL_URLS = {
     "lite": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
 }
 MODEL_URL = MODEL_URLS["full"]
+MIRROR = "https://raw.githubusercontent.com/growthenginenowoslawski/automated-wod-analysis/main/models/{name}"
 
 
 def find_model(download=True, kind="full"):
@@ -57,14 +58,23 @@ def find_model(download=True, kind="full"):
         return None
     dst = DB.WOD_HOME / "models" / name
     dst.parent.mkdir(parents=True, exist_ok=True)
-    MODEL_URL = MODEL_URLS[kind]
     print(f"Downloading the body-tracking model ({kind}, about {9 if kind == 'full' else 6} MB, once)…", flush=True)
     import urllib.request
-    try:
-        urllib.request.urlretrieve(MODEL_URL, dst)
-    except Exception as e:
-        sys.exit(f"Couldn't download the pose model ({e}). Download it from {MODEL_URL} and save it as {dst}")
-    return dst
+    errors = []
+    for url in (MODEL_URLS[kind], MIRROR.format(name=name)):     # Google first, then the copy in this project's repo
+        try:
+            tmp = dst.with_suffix(".part")
+            urllib.request.urlretrieve(url, tmp)
+            if tmp.stat().st_size < 1_000_000:
+                raise IOError("download incomplete")
+            tmp.replace(dst)
+            return dst
+        except Exception as e:
+            errors.append(f"{url}: {e}")
+    if download == "soft":
+        return None
+    sys.exit("Couldn't download the body-tracking model:\n  " + "\n  ".join(errors) +
+             f"\nDownload it in a browser from {MODEL_URLS[kind]} and save it as {dst}")
 
 
 def creation_time(video):

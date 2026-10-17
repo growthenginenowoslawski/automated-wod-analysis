@@ -102,7 +102,10 @@ def setup(no_watcher=False):
     print(f"✓ data folder: {home}")
     from . import ff
     print(f"✓ video tools: {'system ffmpeg' if shutil.which('ffmpeg') else 'bundled ffmpeg'} ({ff.exe()})")
-    print(f"✓ body-tracking model: {find_model(download=True)}")
+    model = find_model(download="soft")
+    print(f"✓ body-tracking model: {model}" if model else
+          "✗ body-tracking model: couldn't download it (network blocked?). Run `wod doctor --download` later; "
+          "everything else is set up.")
     for line in install_assistant_files():
         print(f"✓ {line}")
     if not no_watcher:
